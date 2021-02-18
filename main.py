@@ -11,6 +11,8 @@ class ETL:
         self.df = pd.read_csv(absolute_path, header=[1,2], index_col=0)
         self.trough_real_world_length = trough_real_world_length
         self.height_of_ROI = height_of_ROI
+        self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.roi_corners()
+        self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.trough_coords
 
     def euc_dist(self, x1, y1, x2, y2):
         return math.sqrt((x1-x2)**2 + (y1-y2)**2)
@@ -23,13 +25,13 @@ class ETL:
     def roi_corners(self):
         trough_r_x, trough_r_y, trough_l_x, trough_l_y = self.trough_coords
         xy_deg = math.degrees(math.atan2(trough_l_y - trough_r_y, trough_r_x - trough_r_y))
-        angle = xy_deg - 90
+        angle = 90 - xy_deg
 
         hypotenuse = self.height_of_ROI*self.pixels_to_real
 
-        dy = hypotenuse*(angle/100)
-        dx = math.sqrt(hypotenuse - dy)
-        # print(dx, dy)
+        dy = hypotenuse*math.cos(angle)
+        dx = math.sqrt(hypotenuse**2 - dy**2)
+        print(dx, dy)
 
         top_left_x, top_left_y = trough_l_x + dx, trough_l_y +dy
         top_right_x, top_right_y = trough_r_x + dx, trough_r_y + dy
@@ -37,9 +39,6 @@ class ETL:
 
     # uses x product to check if given coordinate is inside the ROI
     def in_roi(self, x, y) -> bool:
-        top_left_x, top_left_y, top_right_x, top_right_y = self.roi_corners()
-        bottom_right_x, bottom_right_y, bottom_left_x, bottom_left_y = self.trough_coords
-
         top, right, bottom, left = False, False, False, False
 
         # check x products clockwise (top, right, bottom, left)
@@ -48,26 +47,26 @@ class ETL:
         # if a x b > 0 condition = True else False
         # return all([conditions])
 
-        a = [top_left_x - top_right_x, top_left_y - top_right_y]
-        b = [top_right_x - x, top_right_y - y]
+        a = [self.top_left_x - self.top_right_x, self.top_left_y - self.top_right_y]
+        b = [self.top_right_x - x, self.top_right_y - y]
 
         if a[0]*b[1] - a[1]*b[0] >= 0:
             top = True
 
-        c = [top_right_x - bottom_right_x, top_right_y - bottom_right_y]
-        d = [bottom_right_x - x, bottom_right_y - y]
+        c = [self.top_right_x - self.bottom_right_x, self.top_right_y - self.bottom_right_y]
+        d = [self.bottom_right_x - x, self.bottom_right_y - y]
 
         if c[0]*d[1] - c[1]*d[0] >= 0:
             right = True
 
-        e = [bottom_right_x - bottom_left_x, bottom_right_y - bottom_left_y]
-        f = [bottom_left_x - x, bottom_right_y - y]
+        e = [self.bottom_right_x - self.bottom_left_x, self.bottom_right_y - self.bottom_left_y]
+        f = [self.bottom_left_x - x, self.bottom_left_y - y]
 
         if e[0]*f[1] - e[1]*f[0] >= 0:
             bottom = True
         
-        g = [bottom_left_x - top_left_x, bottom_left_y - top_left_y]
-        h = [top_left_x - x, top_left_y - y]
+        g = [self.bottom_left_x - self.top_left_x, self.bottom_left_y - self.top_left_y]
+        h = [self.top_left_x - x, self.top_left_y - y]
 
         if g[0]*h[1] - g[1]*h[0] >= 0:
             left = True
@@ -135,8 +134,8 @@ if __name__ == "__main__":
 
         xs = []
 
-        for i in range(0, 1000, 10):
-            for j in range(0, 1000, 10):
+        for i in range(0, 1000, 5):
+            for j in range(0, 1000, 5):
                 xs.append([i, j, etl.in_roi(i, j)])
 
         x = np.asarray(xs)
