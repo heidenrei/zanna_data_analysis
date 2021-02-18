@@ -3,36 +3,123 @@ import numpy as np
 import math
 
 absolute_path = '/home/gavin/zanna_data_analysis/01_Experiment 1_2019-11-08_S1_T1DLC_resnet50_ORDER_leftarm v2Feb10shuffle1_750000.csv'
+trough_real_world_length = 9.5
+
 class ETL:
-    def __init__(self, absolute_path):
+    def __init__(self, absolute_path, trough_real_world_length, height_of_ROI):
         self.df = pd.read_csv(absolute_path, header=[1,2], index_col=0)
-        self.get_roi()
+        self.trough_real_world_length = trough_real_world_length
+        self.height_of_ROI = height_of_ROI
 
+    def euc_dist(self, x1, y1, x2, y2):
+        return math.sqrt((x1-x2)**2 + (y1-y2)**2)
 
+        # new idea:
+        # get vectors of the 4 borders of the roi and see if cross product with the point is > 0
+        # need top two points...
+        # 
 
-    def get_roi(self):
-        trough_r_x = self.df['troughR']['x'].mean()
-        trough_r_y = self.df['troughR']['y'].mean()
-        trough_l_x = self.df['troughL']['x'].mean()
-        trough_l_y = self.df['troughL']['y'].mean()
-        
+    def roi_corners(self):
+        trough_r_x, trough_r_y, trough_l_x, trough_l_y = self.trough_coords
         xy_deg = math.degrees(math.atan2(trough_l_y - trough_r_y, trough_r_x - trough_r_y))
+        angle = xy_deg - 90
 
+        hypotenuse = self.height_of_ROI*self.pixels_to_real
+
+        dy = hypotenuse*(angle/100)
+        dx = math.sqrt(hypotenuse - dy)
+        print(dx, dy)
+
+        top_left_x, top_left_y = trough_l_x + dx, trough_l_y +dy
+        top_right_x, top_right_y = trough_r_x + dx, trough_r_y + dy
+        return top_left_x, top_left_y, top_right_x, top_right_y
+
+    # uses cross product to check if given coordinate is inside the ROI
+    def in_roi(self, x, y) -> bool:
+        top_left_x, top_left_y, top_right_x, top_right_y = self.roi_corners
+        bottom_right_x, bottom_right_y, bottom_left_x, bottom_left_y = self.trough_coords
+        top, right, bottom, left = False, False, False, False
+        # check cross products clockwise (top, right, bottom, left)
+        # let a = the vector between the two points making our boundary
+        # let b = the vector between one point in our boundary and the given coordinates
+        # if a x b > 0 condition = True else False
+        # return all([conditions])
+        a = [top_left_x - top_right_x, top_left_y - top_right_y]
+        b = [top_right_x - x, top_right_y - y]
+
+        if np.cross(a, b) >= 0:
+            top = True
+
+        c = [top_right_x - bottom_right_x, top_right_y - bottom_right_y]
+        d = [bottom_right_x - x, bottom_right_y - y]
+
+        if np.cross(c, d) >= 0:
+            right = True
+
+        e = [bottom_right_x - bottom_left_x, bottom_right_y - bottom_left_y]
+        f = [bottom_left_x - x, bottom_right_y - y]
+
+        if np.cross(e, f) >= 0:
+            bottom = True
         
+        g = [bottom_left_x - top_left_x, bottom_left_y - top_left_y]
+        h = [top_left_x - x, top_left_y - y]
+
+        if np.cross(g, h) >= 0:
+            left = True
+
+        return all([top, right, bottom, left])
+
+    # gets the coords of x given a y value
+    def get_x_coords(self, y, intercept, angle):
+        return (y/angle - intercept/angle)
+
+    # returns the coordinates of the top left and top right of the roi
+    # I THINK THIS MIGHT BE WRONG
+    @property
+    def get_roi_corners(self):
+        trough_r_x, trough_r_y, trough_l_x, trough_l_y = self.trough_coords
+        xy_deg = math.degrees(math.atan2(trough_l_y - trough_r_y, trough_r_x - trough_r_y))
+        angle = xy_deg - 90
+
+        hypotenuse = self.height_of_ROI*self.pixels_to_real
+
+        dy = hypotenuse*(angle/100)
+        dx = math.sqrt(hypotenuse - dy)
+
+        top_left_x, top_left_y = trough_l_x + dx, trough_l_y +dy
+        top_right_x, top_right_y = trough_r_x + dx, trough_r_y + dy
+        return top_left_x, top_left_y, top_right_x, top_right_y
+
+    # returns the average point of the troughl and troughr labels
+    @property
+    def trough_coords(self):
+        trough_r_x = round(self.df['troughR']['x'].mean())
+        trough_r_y = round(self.df['troughR']['y'].mean())
+        trough_l_x = round(self.df['troughL']['x'].mean())
+        trough_l_y = round(self.df['troughL']['y'].mean())
+
+        return trough_r_x, trough_r_y, trough_l_x, trough_l_y
 
     @property
     def print_head(self):
         print(self.df.head())
 
+    # ratio of pixels to real world cm
+    @property
+    def pixels_to_real(self):
+        trough_r_x, trough_r_y, trough_l_x, trough_l_y = self.trough_coords
+        return self.euc_dist(trough_r_x, trough_r_y, trough_l_x, trough_l_y)/self.trough_real_world_length
 
 def main():
-    etl = ETL(absolute_path)
-    # etl.print_head
+    etl = ETL(absolute_path, trough_real_world_length, 2.2)
 
 if __name__ == "__main__":
-    DEBUG = False
+    DEBUG = True
 
     if DEBUG:
-        pass
+        etl = ETL(absolute_path, trough_real_world_length, 2.2)
+        
+
     else:
         main()
