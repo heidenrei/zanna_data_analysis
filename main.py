@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import math
 
 absolute_path = '/home/gavin/zanna_data_analysis/01_Experiment 1_2019-11-08_S1_T1DLC_resnet50_ORDER_leftarm v2Feb10shuffle1_750000.csv'
 class ETL:
@@ -14,7 +15,10 @@ class ETL:
         trough_r_y = self.df['troughR']['y'].mean()
         trough_l_x = self.df['troughL']['x'].mean()
         trough_l_y = self.df['troughL']['y'].mean()
-        print(trough_r_x, trough_r_y)
+        
+        xy_deg = math.degrees(math.atan2(trough_l_y - trough_r_y, trough_r_x - trough_r_y))
+
+        
 
     @property
     def print_head(self):
