@@ -124,14 +124,39 @@ class utils:
         drawer.polygon([self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y, self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y])
         img.show()
 
+    # x product
+    def orientation(self, p1, p2, p3):
+        x1, y1 = p1
+        x2, y2 = p2
+        x3, y3 = p3
+
+        return (y2 - y1) * (x3 - x2) - (x2 - x1) * (y3 - y2)
+
     def get_convex_hull(self):
         df = self.etl.df['paw']
         df.drop(columns=['likelihood'], inplace=True)
         coords = df.values.tolist()
-        
-        start = min(coords, key = lambda x: x[0])
 
+        N = len(coords)
+        hull = []
+        start = curr = coords.index(min(coords, key = lambda x: x[0]))
         
+
+        while 1:
+            q = (curr + 1) % N
+            for i in range(N):
+                if i != curr:
+                    orien = self.orientation(coords[curr], coords[i], coords[q])
+                    # or if they are collinear.. ie euc dist to second point is longest than to current point
+                    if orien > 0 or (orien == 0 and self.etl.euc_dist(coords[start][0], coords[start][1], coords[curr][0], coords[curr][1]]) < self.etl.euc_dist(coords[start][0], coords[start][1], coords[i][0], coords[i][1]])):
+                        curr = i
+            curr = q
+            if curr == start:
+                break
+
+            hull.append(coords[q])
+
+        return hull
 
 
 def main():
@@ -146,6 +171,7 @@ if __name__ == "__main__":
         # ut.plot_roi()
         # ut.outline_roi(sample_image)
         ut.get_convex_hull()
+        print(ut.get_angle([0, 0], [1, 4], [7,0]))
 
     else:
         main()
