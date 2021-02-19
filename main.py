@@ -168,6 +168,7 @@ class utils:
 
             if far_point == start:
                 break
+            
             hull.append(far_point)
             point = far_point
 
@@ -181,7 +182,7 @@ class utils:
         drawer = ImageDraw.Draw(img)
         drawer.polygon(hull)
         img.show()
-        
+
 
 def main():
     etl = ETL(absolute_path, trough_real_world_length, height_of_ROI)
