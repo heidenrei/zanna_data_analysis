@@ -127,8 +127,10 @@ class utils:
     # x product
     def orientation(self, p1, p2, p3):
         x1, y1 = p1
-        x2, y2 = p2
-        x3, y3 = p3
+        x2, y2 = p3
+        x3, y3 = p2
+
+        print(p1, p2, p3)
 
         return (y2 - y1) * (x3 - x2) - (x2 - x1) * (y3 - y2)
 
@@ -138,26 +140,36 @@ class utils:
         coords = df.values.tolist()
 
         N = len(coords)
-        hull = []
-        start = curr = coords.index(min(coords, key = lambda x: x[0]))
-        
+        start = point = coords.index(min(coords, key = lambda x: x[0]))
+        hull = [start]
 
-        while 1:
-            q = (curr + 1) % N
+        far_point = None
+
+        while far_point is not start:
+
+            p1 = None
             for i in range(N):
-                if i != curr:
-                    orien = self.orientation(coords[curr], coords[i], coords[q])
-                    # or if they are collinear.. ie euc dist to second point is longest than to current point
-                    if orien > 0 or (orien == 0 and self.etl.euc_dist(coords[start][0], coords[start][1], coords[curr][0], coords[curr][1]]) < self.etl.euc_dist(coords[start][0], coords[start][1], coords[i][0], coords[i][1]])):
-                        curr = i
-            curr = q
-            if curr == start:
+                if i is point:
+                    continue
+                else:
+                    p1 = i
+                    break
+            far_point = p1
+
+            for j in range(N):
+                if j is point or j is p1:
+                    continue
+                else:
+                    direction = self.orientation(coords[point], coords[far_point], coords[j])
+                    if direction > 0:
+                        far_point = j
+
+            if far_point == start:
                 break
+            hull.append(far_point)
+            point = far_point
 
-            hull.append(coords[q])
-
-        return hull
-
+        return [coords[x] for x in hull]
 
 def main():
     etl = ETL(absolute_path, trough_real_world_length, height_of_ROI)
@@ -170,8 +182,9 @@ if __name__ == "__main__":
         ut = utils(absolute_path, trough_real_world_length, height_of_ROI)
         # ut.plot_roi()
         # ut.outline_roi(sample_image)
-        ut.get_convex_hull()
-        print(ut.get_angle([0, 0], [1, 4], [7,0]))
+        hull = ut.get_convex_hull()
+        print(len(hull))
+        print(hull)
 
     else:
         main()
