@@ -7,14 +7,18 @@ from PIL import Image, ImageDraw
 absolute_path = '/home/gavin/zanna_data_analysis/01_Experiment 1_2019-11-08_S1_T1DLC_resnet50_ORDER_leftarm v2Feb10shuffle1_750000.csv'
 trough_real_world_length = 9.5
 height_of_ROI = 2.2
-sample_image = r'/home/gavin/Downloads/01_Experiment 1_2019-11-08_S1_T1.png'
+trough_left_offset = 0.35
+trough_right_offset = 0.5
+sample_image = r'/home/gavin/zanna_data_analysis/01_Experiment 1_2019-11-08_S1_T1.png'
 p_cutoff = 0.9
 
 class ETL:
-    def __init__(self, absolute_path, trough_real_world_length, height_of_ROI):
+    def __init__(self, absolute_path, trough_real_world_length, height_of_ROI, trough_left_offset=0, trough_right_offset=0):
         self.df = pd.read_csv(absolute_path, header=[1,2], index_col=0)
         self.trough_real_world_length = trough_real_world_length
         self.height_of_ROI = height_of_ROI
+        self.trough_left_offset = trough_left_offset
+        self.trough_right_offset = trough_right_offset
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.roi_corners()
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.trough_coords
 
@@ -31,6 +35,7 @@ class ETL:
         xy_deg = math.degrees(math.atan2(trough_l_y - trough_r_y, trough_r_x - trough_r_y))
         angle = 90 - xy_deg
 
+        # need to get bottom corners of roi first
         hypotenuse = self.height_of_ROI*self.pixels_to_real
 
         dy = hypotenuse*math.cos(angle)
@@ -76,6 +81,9 @@ class ETL:
 
         return all([top, right, bottom, left])
 
+    
+    
+
     # gets the coords of x given a y value
     def get_x_coords(self, y, intercept, angle):
         return (y/angle - intercept/angle)
@@ -88,7 +96,16 @@ class ETL:
         trough_l_x = self.df['troughL']['x'].mean()
         trough_l_y = self.df['troughL']['y'].mean()
 
-        return trough_r_x, trough_r_y, trough_l_x, trough_l_y
+        xy_deg = math.degrees(math.atan2(trough_l_y - trough_r_y, trough_r_x - trough_r_y))
+        pix_to_real = self.euc_dist(trough_r_x, trough_r_y, trough_l_x, trough_l_y)/self.trough_real_world_length
+
+        l_dy = math.sin(math.radians(xy_deg)) * (pix_to_real*self.trough_left_offset) # inverse sign of slope
+        l_dx = math.sqrt(l_dy**2 + (pix_to_real*self.trough_left_offset)**2)
+
+        r_dy = math.sin(math.radians(xy_deg)) * (pix_to_real*self.trough_right_offset) # same as sign of slope
+        r_dx = math.sqrt(r_dy**2 + (pix_to_real*self.trough_right_offset)**2)
+
+        return trough_r_x + r_dx, trough_r_y - r_dy, trough_l_x - l_dx, trough_l_y + l_dy
 
     @property
     def print_head(self):
@@ -102,8 +119,8 @@ class ETL:
 
 
 class utils:
-    def __init__(self, absolute_path, trough_real_world_length, height_of_ROI, p_cuttoff):
-        self.etl = ETL(absolute_path, trough_real_world_length, height_of_ROI)
+    def __init__(self, absolute_path, trough_real_world_length, height_of_ROI, p_cuttoff, trough_left_offset, trough_right_offset):
+        self.etl = ETL(absolute_path, trough_real_world_length, height_of_ROI, trough_left_offset, trough_right_offset)
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.etl.roi_corners()
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.etl.trough_coords
 
@@ -192,8 +209,10 @@ if __name__ == "__main__":
     DEBUG = True
 
     if DEBUG:
-        ut = utils(absolute_path, trough_real_world_length, height_of_ROI, p_cutoff)
-        ut.outline_hull(sample_image)
+        ut = utils(absolute_path, trough_real_world_length, height_of_ROI, p_cutoff, trough_left_offset, trough_right_offset)
+        # ut.outline_hull(sample_image)
+        # ut.outline_roi(sample_image)
+        # ut.plot_roi()
 
     else:
         main()
