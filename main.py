@@ -11,16 +11,19 @@ trough_left_offset = 0.35
 trough_right_offset = 0.5
 sample_image = r'/home/gavin/zanna_data_analysis/01_Experiment 1_2019-11-08_S1_T1.png'
 p_cutoff = 0.9
+FPS = 23
 
 class ETL:
-    def __init__(self, absolute_path, trough_real_world_length, height_of_ROI, trough_left_offset=0, trough_right_offset=0):
+    def __init__(self, absolute_path, FPS, trough_real_world_length, height_of_ROI, trough_left_offset=0, trough_right_offset=0):
         self.df = pd.read_csv(absolute_path, header=[1,2], index_col=0)
         self.trough_real_world_length = trough_real_world_length
         self.height_of_ROI = height_of_ROI
         self.trough_left_offset = trough_left_offset
         self.trough_right_offset = trough_right_offset
+        self.FPS = FPS
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.roi_corners()
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.trough_coords
+        self.add_time_on_task()
 
     def euc_dist(self, x1, y1, x2, y2):
         return math.sqrt((x1-x2)**2 + (y1-y2)**2)
@@ -81,8 +84,42 @@ class ETL:
 
         return all([top, right, bottom, left])
 
-    
-    
+    def add_time_on_task(self):
+        # self.df['nose_in_roi'] = self.in_roi(self.df['nose']['x'], self.df['nose']['y'])
+        # self.df['nose_in_roi'] = self.df.apply(lambda v: 1 if self.in_roi(v.nose.x, v.nose.y) else 0)
+        # self.df = self.df.assign(nose_in_roi=lambda v: (self.in_roi(v['nose']['x'], v['nose']['y'])))
+        # self.df['paw_in_roi'] = self.in_roi(self.df['paw']['x'], self.df['paw']['y'])
+
+        for i, row in self.df.iterrows():
+            nose_in_roi_bool = True
+            paw_in_roi_bool = True
+            if not self.in_roi(self.df.loc[i]['nose']['x'], self.df.loc[i]['nose']['y']):
+                nose_in_roi_bool = False
+            if not self.in_roi(self.df.loc[i]['paw']['x'], self.df.loc[i]['paw']['y']):
+                paw_in_roi_bool = False
+
+            self.df.at[i, 'nose_in_roi'] = nose_in_roi_bool
+            self.df.at[i, 'paw_in_roi'] = paw_in_roi_bool
+
+        print(self.df['nose_in_roi'].sum())
+        print(self.df['paw_in_roi'].sum())
+
+        self.df['cumsum_paw_in_roi'] = (self.df['paw_in_roi'] == True).cumsum()
+        self.df['cumsum_nose_in_roi'] = (self.df['nose_in_roi'] == True).cumsum()
+
+        self.df['paw_in_roi_total_time'] = self.df['cumsum_paw_in_roi'] / self.FPS
+        self.df['nose_in_roi_total_time'] = self.df['cumsum_nose_in_roi'] / self.FPS
+
+
+        self.df['consecutive_frames_with_paw_in_roi'] = self.df['paw_in_roi'].groupby((self.df['paw_in_roi'] == False).cumsum()).cumcount()
+        self.df['consecutive_frames_with_nose_in_roi'] = self.df['nose_in_roi'].groupby((self.df['nose_in_roi'] == False).cumsum()).cumcount()
+
+        self.df['paw_in_roi_this_time'] = self.df['consecutive_frames_with_paw_in_roi'] / self.FPS
+        self.df['nose_in_roi_this_time'] = self.df['consecutive_frames_with_nose_in_roi'] / self.FPS
+        print(self.df.head())
+
+
+        # print(self.df.loc[0]['nose']['x'])
 
     # gets the coords of x given a y value
     def get_x_coords(self, y, intercept, angle):
@@ -119,8 +156,8 @@ class ETL:
 
 
 class utils:
-    def __init__(self, absolute_path, trough_real_world_length, height_of_ROI, p_cuttoff, trough_left_offset, trough_right_offset):
-        self.etl = ETL(absolute_path, trough_real_world_length, height_of_ROI, trough_left_offset, trough_right_offset)
+    def __init__(self, absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cuttoff, trough_left_offset, trough_right_offset):
+        self.etl = ETL(absolute_path, FPS, trough_real_world_length, height_of_ROI, trough_left_offset, trough_right_offset)
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.etl.roi_corners()
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.etl.trough_coords
 
@@ -202,14 +239,14 @@ class utils:
 
 
 def main():
-    etl = ETL(absolute_path, trough_real_world_length, height_of_ROI)
+    etl = ETL(absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cutoff, trough_left_offset, trough_right_offset)
 
 
 if __name__ == "__main__":
     DEBUG = True
 
     if DEBUG:
-        ut = utils(absolute_path, trough_real_world_length, height_of_ROI, p_cutoff, trough_left_offset, trough_right_offset)
+        ut = utils(absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cutoff, trough_left_offset, trough_right_offset)
         # ut.outline_hull(sample_image)
         # ut.outline_roi(sample_image)
         # ut.plot_roi()
