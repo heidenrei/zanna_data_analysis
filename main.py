@@ -12,9 +12,10 @@ trough_right_offset = 0.5
 sample_image = r'/home/gavin/zanna_data_analysis/01_Experiment 1_2019-11-08_S1_T1.png'
 p_cutoff = 0.9
 FPS = 23
+output_file_path = r'/home/gavin/zanna_data_analysis/output1.csv'
 
 class ETL:
-    def __init__(self, absolute_path, FPS, trough_real_world_length, height_of_ROI, trough_left_offset=0, trough_right_offset=0):
+    def __init__(self, absolute_path, FPS, trough_real_world_length, height_of_ROI, output_file_path, trough_left_offset=0, trough_right_offset=0):
         self.df = pd.read_csv(absolute_path, header=[1,2], index_col=0)
         self.trough_real_world_length = trough_real_world_length
         self.height_of_ROI = height_of_ROI
@@ -25,7 +26,9 @@ class ETL:
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.trough_coords
         self.add_time_metrics()
         self.add_velocity_metrics()
+        self.add_velocity_metrics_from_origin
         self.print_head
+        self.df.to_csv(output_file_path)
 
     def euc_dist(self, x1, y1, x2, y2):
         return math.sqrt((x1-x2)**2 + (y1-y2)**2)
@@ -118,6 +121,8 @@ class ETL:
 
 
     def add_velocity_metrics(self):
+        cm_conversion = self.pixels_to_real
+
         for i, row in self.df.iterrows():
             if i > 0:
                 paw_euc_dist = self.euc_dist(self.df.loc[i]['paw']['x'], self.df.loc[i]['paw']['y'], self.df.loc[i-1]['paw']['x'], self.df.loc[i-1]['paw']['y'])
@@ -126,8 +131,8 @@ class ETL:
                 paw_euc_dist = 0
                 nose_euc_dist = 0
 
-            self.df.at[i, 'paw_euc_dist_with_last_row'] = paw_euc_dist
-            self.df.at[i, 'nose_euc_dist_with_last_row'] = nose_euc_dist
+            self.df.at[i, 'paw_euc_dist_with_last_row'] = paw_euc_dist / cm_conversion
+            self.df.at[i, 'nose_euc_dist_with_last_row'] = nose_euc_dist / cm_conversion
 
         self.df['paw_velocity_5_frame'] = self.df['paw_euc_dist_with_last_row'].rolling(5).sum()
         self.df['paw_velocity_10_frame'] = self.df['paw_euc_dist_with_last_row'].rolling(10).sum()
@@ -135,6 +140,32 @@ class ETL:
         self.df['nose_velocity_5_frame'] = self.df['nose_euc_dist_with_last_row'].rolling(5).sum()
         self.df['nose_velocity_10_frame'] = self.df['nose_euc_dist_with_last_row'].rolling(10).sum()
 
+    def add_velocity_metrics_from_origin(self):
+        cm_conversion = self.pixels_to_real
+
+        for i, row in self.df.iterrows():
+            paw_euc_dist_from_origin = self.euc_dist(self.df.loc[i]['paw']['x'], self.df.loc[i]['paw']['y'], 1295, 729)
+            nose_euc_dist_from_origin = self.euc_dist(self.df.loc[i]['nose']['x'], self.df.loc[i]['nose']['y'], 1295, 729)
+
+            self.df.at[i, 'paw_euc_dist_from_origin'] = paw_euc_dist_from_origin / cm_conversion
+            self.df.at[i, 'nose_euc_dist_from_origin'] = nose_euc_dist_from_origin / cm_conversion
+
+        for i, row in self.df.iterrows():
+            if i > 0:
+                paw_euc_dist_d = self.df.loc[i]['paw_euc_dist_from_origin'] - self.df.loc[i-1]['paw_euc_dist_from_origin']
+                nose_euc_dist_d = self.df.loc[i]['paw_euc_dist_from_origin'] - self.df.loc[i-1]['paw_euc_dist_from_origin']
+            else:
+                paw_euc_dist = 0
+                nose_euc_dist = 0
+
+            self.df.at[i, 'paw_euc_dist_from_origin_2_frame_d'] = paw_euc_dist_d
+            self.df.at[i, 'nose_euc_dist_from_origin_2_frame_d'] = nose_euc_dist_d
+
+        self.df['paw_euc_dist_from_origin_5_frame_d_sum'] = self.df['paw_euc_dist_from_origin_2_frame_d'].rolling(5).sum()
+        self.df['paw_euc_dist_from_origin_10_frame_d_sum'] = self.df['paw_euc_dist_from_origin_2_frame_d'].rolling(10).sum()
+
+        self.df['nose_euc_dist_from_origin_5_frame_d_sum'] = self.df['nose_euc_dist_from_origin_2_frame_d'].rolling(5).sum()
+        self.df['nose_euc_dist_from_origin_10_frame_d_sum'] = self.df['nose_euc_dist_from_origin_2_frame_d'].rolling(10).sum()
 
     # gets the coords of x given a y value
     def get_x_coords(self, y, intercept, angle):
@@ -171,7 +202,7 @@ class ETL:
 
 
 class utils:
-    def __init__(self, absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cuttoff, trough_left_offset, trough_right_offset):
+    def __init__(self, absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cuttoff, output_file_path, trough_left_offset, trough_right_offset):
         self.etl = ETL(absolute_path, FPS, trough_real_world_length, height_of_ROI, trough_left_offset, trough_right_offset)
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.etl.roi_corners()
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.etl.trough_coords
@@ -254,14 +285,14 @@ class utils:
 
 
 def main():
-    etl = ETL(absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cutoff, trough_left_offset, trough_right_offset)
+    etl = ETL(absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
 
 
 if __name__ == "__main__":
     DEBUG = True
 
     if DEBUG:
-        ut = utils(absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cutoff, trough_left_offset, trough_right_offset)
+        ut = utils(absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
         # ut.outline_hull(sample_image)
         # ut.outline_roi(sample_image)
         # ut.plot_roi()
