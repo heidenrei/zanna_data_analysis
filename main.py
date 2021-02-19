@@ -15,7 +15,7 @@ FPS = 23
 output_file_path = r'/home/gavin/zanna_data_analysis/output1.csv'
 
 class ETL:
-    def __init__(self, absolute_path, FPS, trough_real_world_length, height_of_ROI, output_file_path, trough_left_offset=0, trough_right_offset=0):
+    def __init__(self, absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset=0, trough_right_offset=0):
         self.df = pd.read_csv(absolute_path, header=[1,2], index_col=0)
         self.trough_real_world_length = trough_real_world_length
         self.height_of_ROI = height_of_ROI
@@ -26,7 +26,7 @@ class ETL:
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.trough_coords
         self.add_time_metrics()
         self.add_velocity_metrics()
-        self.add_velocity_metrics_from_origin
+        self.add_velocity_metrics_from_origin()
         self.print_head
         self.df.to_csv(output_file_path)
 
@@ -153,10 +153,12 @@ class ETL:
         for i, row in self.df.iterrows():
             if i > 0:
                 paw_euc_dist_d = self.df.loc[i]['paw_euc_dist_from_origin'] - self.df.loc[i-1]['paw_euc_dist_from_origin']
-                nose_euc_dist_d = self.df.loc[i]['paw_euc_dist_from_origin'] - self.df.loc[i-1]['paw_euc_dist_from_origin']
+                nose_euc_dist_d = self.df.loc[i]['nose_euc_dist_from_origin'] - self.df.loc[i-1]['nose_euc_dist_from_origin']
+                paw_euc_dist_d = paw_euc_dist_d[0]
+                nose_euc_dist_d = nose_euc_dist_d[0]
             else:
-                paw_euc_dist = 0
-                nose_euc_dist = 0
+                paw_euc_dist_d = 0
+                nose_euc_dist_d = 0
 
             self.df.at[i, 'paw_euc_dist_from_origin_2_frame_d'] = paw_euc_dist_d
             self.df.at[i, 'nose_euc_dist_from_origin_2_frame_d'] = nose_euc_dist_d
@@ -202,8 +204,8 @@ class ETL:
 
 
 class utils:
-    def __init__(self, absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cuttoff, output_file_path, trough_left_offset, trough_right_offset):
-        self.etl = ETL(absolute_path, FPS, trough_real_world_length, height_of_ROI, trough_left_offset, trough_right_offset)
+    def __init__(self, absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset):
+        self.etl = ETL(absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.etl.roi_corners()
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.etl.trough_coords
 
