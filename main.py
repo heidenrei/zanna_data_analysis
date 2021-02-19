@@ -23,7 +23,9 @@ class ETL:
         self.FPS = FPS
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.roi_corners()
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.trough_coords
-        self.add_time_on_task()
+        self.add_time_metrics()
+        self.add_velocity_metrics()
+        self.print_head
 
     def euc_dist(self, x1, y1, x2, y2):
         return math.sqrt((x1-x2)**2 + (y1-y2)**2)
@@ -84,7 +86,7 @@ class ETL:
 
         return all([top, right, bottom, left])
 
-    def add_time_on_task(self):
+    def add_time_metrics(self):
         # self.df['nose_in_roi'] = self.in_roi(self.df['nose']['x'], self.df['nose']['y'])
         # self.df['nose_in_roi'] = self.df.apply(lambda v: 1 if self.in_roi(v.nose.x, v.nose.y) else 0)
         # self.df = self.df.assign(nose_in_roi=lambda v: (self.in_roi(v['nose']['x'], v['nose']['y'])))
@@ -101,9 +103,6 @@ class ETL:
             self.df.at[i, 'nose_in_roi'] = nose_in_roi_bool
             self.df.at[i, 'paw_in_roi'] = paw_in_roi_bool
 
-        print(self.df['nose_in_roi'].sum())
-        print(self.df['paw_in_roi'].sum())
-
         self.df['cumsum_paw_in_roi'] = (self.df['paw_in_roi'] == True).cumsum()
         self.df['cumsum_nose_in_roi'] = (self.df['nose_in_roi'] == True).cumsum()
 
@@ -116,10 +115,26 @@ class ETL:
 
         self.df['paw_in_roi_this_time'] = self.df['consecutive_frames_with_paw_in_roi'] / self.FPS
         self.df['nose_in_roi_this_time'] = self.df['consecutive_frames_with_nose_in_roi'] / self.FPS
-        print(self.df.head())
 
 
-        # print(self.df.loc[0]['nose']['x'])
+    def add_velocity_metrics(self):
+        for i, row in self.df.iterrows():
+            if i > 0:
+                paw_euc_dist = self.euc_dist(self.df.loc[i]['paw']['x'], self.df.loc[i]['paw']['y'], self.df.loc[i-1]['paw']['x'], self.df.loc[i-1]['paw']['y'])
+                nose_euc_dist = self.euc_dist(self.df.loc[i]['nose']['x'], self.df.loc[i]['nose']['y'], self.df.loc[i-1]['nose']['x'], self.df.loc[i-1]['nose']['y'])
+            else:
+                paw_euc_dist = 0
+                nose_euc_dist = 0
+
+            self.df.at[i, 'paw_euc_dist_with_last_row'] = paw_euc_dist
+            self.df.at[i, 'nose_euc_dist_with_last_row'] = nose_euc_dist
+
+        self.df['paw_velocity_5_frame'] = self.df['paw_euc_dist_with_last_row'].rolling(5).sum()
+        self.df['paw_velocity_10_frame'] = self.df['paw_euc_dist_with_last_row'].rolling(10).sum()
+
+        self.df['nose_velocity_5_frame'] = self.df['nose_euc_dist_with_last_row'].rolling(5).sum()
+        self.df['nose_velocity_10_frame'] = self.df['nose_euc_dist_with_last_row'].rolling(10).sum()
+
 
     # gets the coords of x given a y value
     def get_x_coords(self, y, intercept, angle):
