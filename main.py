@@ -2,9 +2,12 @@ import pandas as pd
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+from PIL import Image, ImageDraw
 
 absolute_path = '/home/gavin/zanna_data_analysis/01_Experiment 1_2019-11-08_S1_T1DLC_resnet50_ORDER_leftarm v2Feb10shuffle1_750000.csv'
 trough_real_world_length = 9.5
+height_of_ROI = 2.2
+sample_image = r'/home/gavin/Downloads/01_Experiment 1_2019-11-08_S1_T1.png'
 
 class ETL:
     def __init__(self, absolute_path, trough_real_world_length, height_of_ROI):
@@ -31,13 +34,12 @@ class ETL:
 
         dy = hypotenuse*math.cos(angle)
         dx = math.sqrt(hypotenuse**2 - dy**2)
-        print(dx, dy)
 
         top_left_x, top_left_y = trough_l_x + dx, trough_l_y +dy
         top_right_x, top_right_y = trough_r_x + dx, trough_r_y + dy
         return top_left_x, top_left_y, top_right_x, top_right_y
 
-    # uses x product to check if given coordinate is inside the ROI
+    # uses x product to check if given coordinate is inside the ROI..
     def in_roi(self, x, y) -> bool:
         top, right, bottom, left = False, False, False, False
 
@@ -77,30 +79,13 @@ class ETL:
     def get_x_coords(self, y, intercept, angle):
         return (y/angle - intercept/angle)
 
-    # returns the coordinates of the top left and top right of the roi
-    # I THINK THIS MIGHT BE WRONG
-    @property
-    def get_roi_corners(self):
-        trough_r_x, trough_r_y, trough_l_x, trough_l_y = self.trough_coords
-        xy_deg = math.degrees(math.atan2(trough_l_y - trough_r_y, trough_r_x - trough_r_y))
-        angle = xy_deg - 90
-
-        hypotenuse = self.height_of_ROI*self.pixels_to_real
-
-        dy = hypotenuse*(angle/100)
-        dx = math.sqrt(hypotenuse - dy)
-
-        top_left_x, top_left_y = trough_l_x + dx, trough_l_y +dy
-        top_right_x, top_right_y = trough_r_x + dx, trough_r_y + dy
-        return top_left_x, top_left_y, top_right_x, top_right_y
-
     # returns the average point of the troughl and troughr labels
     @property
     def trough_coords(self):
-        trough_r_x = round(self.df['troughR']['x'].mean())
-        trough_r_y = round(self.df['troughR']['y'].mean())
-        trough_l_x = round(self.df['troughL']['x'].mean())
-        trough_l_y = round(self.df['troughL']['y'].mean())
+        trough_r_x = self.df['troughR']['x'].mean()
+        trough_r_y = self.df['troughR']['y'].mean()
+        trough_l_x = self.df['troughL']['x'].mean()
+        trough_l_y = self.df['troughL']['y'].mean()
 
         return trough_r_x, trough_r_y, trough_l_x, trough_l_y
 
@@ -116,41 +101,51 @@ class ETL:
 
 
 class utils:
-    def __init__(self):
-        pass
+    def __init__(self, absolute_path, trough_real_world_length, height_of_ROI):
+        self.etl = ETL(absolute_path, trough_real_world_length, height_of_ROI)
+        self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.etl.roi_corners()
+        self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.etl.trough_coords
 
-    def plot_points(self):
-        pass
+    def plot_roi(self):
+        xs = []
+        for i in range(0, 1000, 5):
+            for j in range(0, 1000, 5):
+                xs.append([i, j, self.etl.in_roi(i, j)])
+
+        x = np.asarray(xs)
+        df = pd.DataFrame(x)
+        plt.scatter(df[0], df[1], c=df[2], cmap=plt.cm.autumn)
+        plt.show()
+
+    def outline_roi(self, input_frame):
+        img = Image.open(input_frame)
+        drawer = ImageDraw.Draw(img)
+        print('1')
+        drawer.polygon([self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y, self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y])
+        img.show()
+
+    def get_convex_hull(self):
+        df = self.etl.df['paw']
+        df.drop(columns=['likelihood'], inplace=True)
+        coords = df.values.tolist()
+        
+        start = min(coords, key = lambda x: x[0])
+
+        
 
 
 def main():
-    etl = ETL(absolute_path, trough_real_world_length, 2.2)
+    etl = ETL(absolute_path, trough_real_world_length, height_of_ROI)
+
 
 if __name__ == "__main__":
     DEBUG = True
 
     if DEBUG:
-        etl = ETL(absolute_path, trough_real_world_length, 2.2)
-
-        xs = []
-
-        for i in range(0, 1000, 5):
-            for j in range(0, 1000, 5):
-                xs.append([i, j, etl.in_roi(i, j)])
-
-        x = np.asarray(xs)
-        df = pd.DataFrame(x)
-        print(df.head())
-        plt.scatter(df[0], df[1], c=df[2], cmap=plt.cm.autumn)
-        plt.show()
-        # col = [np.where(etl.in_roi(x, y))]
-
-        # plt.scatter(x, y, s=5, linewidth=0)
-        # plt.show()
-
-
-
-        
+        ut = utils(absolute_path, trough_real_world_length, height_of_ROI)
+        # ut.plot_roi()
+        # ut.outline_roi(sample_image)
+        ut.get_convex_hull()
 
     else:
         main()
