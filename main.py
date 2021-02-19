@@ -107,6 +107,7 @@ class utils:
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.etl.roi_corners()
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.etl.trough_coords
 
+    # make a plot in ugly mcdonalds colors of where the roi is in the frame
     def plot_roi(self):
         xs = []
         for i in range(0, 1000, 5):
@@ -118,6 +119,7 @@ class utils:
         plt.scatter(df[0], df[1], c=df[2], cmap=plt.cm.autumn)
         plt.show()
 
+    # plot a polygon on a sample frame around where the roi is
     def outline_roi(self, input_frame):
         img = Image.open(input_frame)
         drawer = ImageDraw.Draw(img)
@@ -171,6 +173,7 @@ class utils:
 
         return [coords[x] for x in hull]
 
+    # plot the convex hull of the points where the paw was labeled > p_cuttoff
     def outline_hull(self, input_frame):
         hull = self.get_convex_hull()
         hull = [tuple(x) for x in hull]
@@ -178,6 +181,7 @@ class utils:
         drawer = ImageDraw.Draw(img)
         drawer.polygon(hull)
         img.show()
+        
 
 def main():
     etl = ETL(absolute_path, trough_real_world_length, height_of_ROI)
