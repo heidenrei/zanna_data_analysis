@@ -8,6 +8,7 @@ absolute_path = '/home/gavin/zanna_data_analysis/01_Experiment 1_2019-11-08_S1_T
 trough_real_world_length = 9.5
 height_of_ROI = 2.2
 sample_image = r'/home/gavin/Downloads/01_Experiment 1_2019-11-08_S1_T1.png'
+p_cutoff = 0.9
 
 class ETL:
     def __init__(self, absolute_path, trough_real_world_length, height_of_ROI):
@@ -101,7 +102,7 @@ class ETL:
 
 
 class utils:
-    def __init__(self, absolute_path, trough_real_world_length, height_of_ROI):
+    def __init__(self, absolute_path, trough_real_world_length, height_of_ROI, p_cuttoff):
         self.etl = ETL(absolute_path, trough_real_world_length, height_of_ROI)
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.etl.roi_corners()
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.etl.trough_coords
@@ -120,7 +121,6 @@ class utils:
     def outline_roi(self, input_frame):
         img = Image.open(input_frame)
         drawer = ImageDraw.Draw(img)
-        print('1')
         drawer.polygon([self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y, self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y])
         img.show()
 
@@ -130,12 +130,12 @@ class utils:
         x2, y2 = p3
         x3, y3 = p2
 
-        print(p1, p2, p3)
-
         return (y2 - y1) * (x3 - x2) - (x2 - x1) * (y3 - y2)
 
     def get_convex_hull(self):
-        df = self.etl.df['paw']
+        df = self.etl.df.copy(deep=True)['paw']
+        indices = df[ df['likelihood'] < p_cutoff].index
+        df.drop(indices, inplace=True)
         df.drop(columns=['likelihood'], inplace=True)
         coords = df.values.tolist()
 
@@ -171,6 +171,14 @@ class utils:
 
         return [coords[x] for x in hull]
 
+    def outline_hull(self, input_frame):
+        hull = self.get_convex_hull()
+        hull = [tuple(x) for x in hull]
+        img = Image.open(input_frame)
+        drawer = ImageDraw.Draw(img)
+        drawer.polygon(hull)
+        img.show()
+
 def main():
     etl = ETL(absolute_path, trough_real_world_length, height_of_ROI)
 
@@ -179,12 +187,8 @@ if __name__ == "__main__":
     DEBUG = True
 
     if DEBUG:
-        ut = utils(absolute_path, trough_real_world_length, height_of_ROI)
-        # ut.plot_roi()
-        # ut.outline_roi(sample_image)
-        hull = ut.get_convex_hull()
-        print(len(hull))
-        print(hull)
+        ut = utils(absolute_path, trough_real_world_length, height_of_ROI, p_cutoff)
+        ut.outline_hull(sample_image)
 
     else:
         main()
