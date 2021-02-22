@@ -13,15 +13,17 @@ sample_image = r'/home/gavin/zanna_data_analysis/01_Experiment 1_2019-11-08_S1_T
 p_cutoff = 0.9
 FPS = 23
 output_file_path = r'/home/gavin/zanna_data_analysis/output1.csv'
+reach_threshold = 0.6
 
 class ETL:
-    def __init__(self, absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset=0, trough_right_offset=0):
+    def __init__(self, absolute_path, FPS, reach_threshold, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset=0, trough_right_offset=0):
         self.df = pd.read_csv(absolute_path, header=[1,2], index_col=0)
         self.trough_real_world_length = trough_real_world_length
         self.height_of_ROI = height_of_ROI
         self.trough_left_offset = trough_left_offset
         self.trough_right_offset = trough_right_offset
         self.FPS = FPS
+        self.reach_threshold = reach_threshold #in cm
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.roi_corners()
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.trough_coords
         self.add_time_metrics()
@@ -122,7 +124,6 @@ class ETL:
 
     def add_velocity_metrics(self):
         cm_conversion = self.pixels_to_real
-
         for i, row in self.df.iterrows():
             if i > 0:
                 paw_euc_dist = self.euc_dist(self.df.loc[i]['paw']['x'], self.df.loc[i]['paw']['y'], self.df.loc[i-1]['paw']['x'], self.df.loc[i-1]['paw']['y'])
@@ -173,15 +174,14 @@ class ETL:
         # count number of consecutive negative frames, and when there is a positive frame calculate (r[i-1]-r[i-cnt])
         # look back 3, 4, 5 frames and see if the different between r[i] - r[i-x] > threshold
 
-        df['paw_diff_3_frame'] = df['paw_euc_dist_from_origin'].diff(periods=3)
-        df['paw_diff_5_frame'] = df['paw_euc_dist_from_origin'].diff(periods=5)
+        self.df['paw_diff_3_frame'] = self.df['paw_euc_dist_from_origin'].diff(periods=3)
+        self.df['paw_diff_5_frame'] = self.df['paw_euc_dist_from_origin'].diff(periods=5)
 
-        df['paw_reach_3_frame'] = df['paw_diff_3_frame'] >= self.reach_distance_threshold*cm_conversion
-        df['paw_reach_5_frame'] = df['paw_diff_5_frame'] >= self.reach_distance_threshold*cm_conversion
+        self.df['paw_reach_3_frame'] = (self.df['paw_diff_3_frame'] >= self.reach_threshold) & (self.df['paw_in_roi'] == True)
+        self.df['paw_reach_5_frame'] = (self.df['paw_diff_5_frame'] >= self.reach_threshold) & (self.df['paw_in_roi'] == True)
 
-        df['paw_retract_3_frame'] = df['paw_diff_3_frame'] <= -1*(self.reach_distance_threshold*cm_conversion)
-        df['paw_retract_5_frame'] = df['paw_diff_5_frame'] <= -1*(self.reach_distance_threshold*cm_conversion)
-
+        self.df['paw_retract_3_frame'] = (self.df['paw_diff_3_frame'] <= -1*(self.reach_threshold)) & (self.df['paw_in_roi'] == True)
+        self.df['paw_retract_5_frame'] = (self.df['paw_diff_5_frame'] <= -1*(self.reach_threshold)) & (self.df['paw_in_roi'] == True)
 
     # gets the coords of x given a y value
     def get_x_coords(self, y, intercept, angle):
@@ -213,13 +213,17 @@ class ETL:
     # ratio of pixels to real world cm
     @property
     def pixels_to_real(self):
-        trough_r_x, trough_r_y, trough_l_x, trough_l_y = self.trough_coords
+        trough_r_x = self.df['troughR']['x'].mean()
+        trough_r_y = self.df['troughR']['y'].mean()
+        trough_l_x = self.df['troughL']['x'].mean()
+        trough_l_y = self.df['troughL']['y'].mean()
+
         return self.euc_dist(trough_r_x, trough_r_y, trough_l_x, trough_l_y)/self.trough_real_world_length
 
 
 class utils:
-    def __init__(self, absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset):
-        self.etl = ETL(absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
+    def __init__(self, absolute_path, FPS, reach_threshold, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset):
+        self.etl = ETL(absolute_path, FPS, reach_threshold, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.etl.roi_corners()
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.etl.trough_coords
 
@@ -301,14 +305,14 @@ class utils:
 
 
 def main():
-    etl = ETL(absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
+    etl = ETL(absolute_path, FPS, reach_threshold, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
 
 
 if __name__ == "__main__":
     DEBUG = True
 
     if DEBUG:
-        ut = utils(absolute_path, FPS, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
+        ut = utils(absolute_path, FPS, reach_threshold, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
         # ut.outline_hull(sample_image)
         # ut.outline_roi(sample_image)
         # ut.plot_roi()
