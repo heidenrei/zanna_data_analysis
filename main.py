@@ -140,12 +140,13 @@ class ETL:
         self.df['nose_velocity_5_frame'] = self.df['nose_euc_dist_with_last_row'].rolling(5).sum()
         self.df['nose_velocity_10_frame'] = self.df['nose_euc_dist_with_last_row'].rolling(10).sum()
 
+    # origin should probably be top right or bottom right... 1295, 0 is top right
     def add_velocity_metrics_from_origin(self):
         cm_conversion = self.pixels_to_real
 
         for i, row in self.df.iterrows():
-            paw_euc_dist_from_origin = self.euc_dist(self.df.loc[i]['paw']['x'], self.df.loc[i]['paw']['y'], 1295, 729)
-            nose_euc_dist_from_origin = self.euc_dist(self.df.loc[i]['nose']['x'], self.df.loc[i]['nose']['y'], 1295, 729)
+            paw_euc_dist_from_origin = self.euc_dist(self.df.loc[i]['paw']['x'], self.df.loc[i]['paw']['y'], 1295, 0)
+            nose_euc_dist_from_origin = self.euc_dist(self.df.loc[i]['nose']['x'], self.df.loc[i]['nose']['y'], 1295, 0)
 
             self.df.at[i, 'paw_euc_dist_from_origin'] = paw_euc_dist_from_origin / cm_conversion
             self.df.at[i, 'nose_euc_dist_from_origin'] = nose_euc_dist_from_origin / cm_conversion
@@ -168,6 +169,19 @@ class ETL:
 
         self.df['nose_euc_dist_from_origin_5_frame_d_sum'] = self.df['nose_euc_dist_from_origin_2_frame_d'].rolling(5).sum()
         self.df['nose_euc_dist_from_origin_10_frame_d_sum'] = self.df['nose_euc_dist_from_origin_2_frame_d'].rolling(10).sum()
+
+        # count number of consecutive negative frames, and when there is a positive frame calculate (r[i-1]-r[i-cnt])
+        # look back 3, 4, 5 frames and see if the different between r[i] - r[i-x] > threshold
+
+        df['paw_diff_3_frame'] = df['paw_euc_dist_from_origin'].diff(periods=3)
+        df['paw_diff_5_frame'] = df['paw_euc_dist_from_origin'].diff(periods=5)
+
+        df['paw_reach_3_frame'] = df['paw_diff_3_frame'] >= self.reach_distance_threshold*cm_conversion
+        df['paw_reach_5_frame'] = df['paw_diff_5_frame'] >= self.reach_distance_threshold*cm_conversion
+
+        df['paw_retract_3_frame'] = df['paw_diff_3_frame'] <= -1*(self.reach_distance_threshold*cm_conversion)
+        df['paw_retract_5_frame'] = df['paw_diff_5_frame'] <= -1*(self.reach_distance_threshold*cm_conversion)
+
 
     # gets the coords of x given a y value
     def get_x_coords(self, y, intercept, angle):
