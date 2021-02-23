@@ -23,6 +23,8 @@ class ETL:
         self.trough_left_offset = trough_left_offset
         self.trough_right_offset = trough_right_offset
         self.FPS = FPS
+        self.p_cutoff = p_cutoff
+        self.filter_low_probas()
         self.reach_threshold = reach_threshold #in cm
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.roi_corners()
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.trough_coords
@@ -33,7 +35,23 @@ class ETL:
         self.df.to_csv(output_file_path)
 
     def filter_low_probas(self):
-        
+        print('before: ')
+        print(self.df.isna().sum())
+
+        for i, row in self.df.iterrows():
+            if self.df.loc[i]['paw']['likelihood'] < self.p_cutoff:
+                self.df.loc[i]['paw']['x'] = np.nan
+                self.df.loc[i]['paw']['y'] = np.nan
+
+        for i, row in self.df.iterrows():
+            if self.df.loc[i]['nose']['likelihood'] < self.p_cutoff:
+                self.df.loc[i]['nose']['x'] = np.nan
+                self.df.loc[i]['nose']['y'] = np.nan
+
+        print('')
+        print('after: ')
+        print(self.df.isna().sum())
+
 
     def euc_dist(self, x1, y1, x2, y2):
         return math.sqrt((x1-x2)**2 + (y1-y2)**2)
