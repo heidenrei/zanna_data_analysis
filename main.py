@@ -32,6 +32,9 @@ class ETL:
         self.print_head
         self.df.to_csv(output_file_path)
 
+    def filter_low_probas(self):
+        
+
     def euc_dist(self, x1, y1, x2, y2):
         return math.sqrt((x1-x2)**2 + (y1-y2)**2)
 
