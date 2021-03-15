@@ -213,6 +213,27 @@ class ETL:
                 change_in_reach_5_frame = False
             self.df.at[i, 'change_in_reach_5_frame'] = change_in_reach_5_frame
 
+        for i, row in self.df.iterrows():
+            if i > 0:
+                change_in_reach_3_frame = True if (self.df.loc[i]['paw_reach_3_frame'][0] == True and self.df.loc[i-1]['paw_reach_3_frame'][0] == False) else False
+            else:
+                change_in_reach_3_frame = False
+            self.df.at[i, 'change_in_reach_3_frame'] = change_in_reach_3_frame
+
+        for i, row in self.df.iterrows():
+            if i > 0:
+                change_in_retract_5_frame = True if (self.df.loc[i]['paw_retract_5_frame'][0] == True and self.df.loc[i-1]['paw_retract_5_frame'][0] == False) else False
+            else:
+                change_in_retract_5_frame = False
+            self.df.at[i, 'change_in_retract_5_frame'] = change_in_retract_5_frame
+
+        for i, row in self.df.iterrows():
+            if i > 0:
+                change_in_retract_3_frame = True if (self.df.loc[i]['paw_retract_3_frame'][0] == True and self.df.loc[i-1]['paw_retract_3_frame'][0] == False) else False
+            else:
+                change_in_retract_3_frame = False
+            self.df.at[i, 'change_in_retract_3_frame'] = change_in_retract_3_frame
+
     # gets the coords of x given a y value
     def get_x_coords(self, y, intercept, angle):
         return (y/angle - intercept/angle)
