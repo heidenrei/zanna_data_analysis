@@ -14,8 +14,8 @@ p_cutoff = 0.9
 FPS = 23
 output_file_path = r'/home/gavin/zanna_data_analysis/output1.csv'
 reach_threshold = 0.6
-retract_threshold_3_frame = -0.31
-retract_threshold_5_frame = -0.4
+retract_threshold_3_frame = 0.31
+retract_threshold_5_frame = 0.4
 
 class ETL:
     def __init__(self, absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset=0, trough_right_offset=0):
