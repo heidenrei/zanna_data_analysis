@@ -14,9 +14,11 @@ p_cutoff = 0.9
 FPS = 23
 output_file_path = r'/home/gavin/zanna_data_analysis/output1.csv'
 reach_threshold = 0.6
+retract_threshold_3_frame = -0.31
+retract_threshold_5_frame = -0.4
 
 class ETL:
-    def __init__(self, absolute_path, FPS, reach_threshold, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset=0, trough_right_offset=0):
+    def __init__(self, absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset=0, trough_right_offset=0):
         self.df = pd.read_csv(absolute_path, header=[1,2], index_col=0)
         self.trough_real_world_length = trough_real_world_length
         self.height_of_ROI = height_of_ROI
@@ -26,6 +28,8 @@ class ETL:
         self.p_cutoff = p_cutoff
         self.filter_low_probas()
         self.reach_threshold = reach_threshold #in cm
+        self.retract_threshold_3_frame = retract_threshold_3_frame
+        self.retract_threshold_5_frame = retract_threshold_5_frame
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.roi_corners()
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.trough_coords
         self.add_time_metrics()
@@ -202,8 +206,8 @@ class ETL:
         self.df['paw_reach_3_frame'] = (self.df['paw_diff_3_frame'] >= self.reach_threshold) & (self.df['paw_in_roi'] == True)
         self.df['paw_reach_5_frame'] = (self.df['paw_diff_5_frame'] >= self.reach_threshold) & (self.df['paw_in_roi'] == True)
 
-        self.df['paw_retract_3_frame'] = (self.df['paw_diff_3_frame'] <= -1*(self.reach_threshold)) & (self.df['paw_in_roi'] == True)
-        self.df['paw_retract_5_frame'] = (self.df['paw_diff_5_frame'] <= -1*(self.reach_threshold)) & (self.df['paw_in_roi'] == True)
+        self.df['paw_retract_3_frame'] = (self.df['paw_diff_3_frame'] <= -1*(self.retract_threshold_3_frame)) & (self.df['paw_in_roi'] == True)
+        self.df['paw_retract_5_frame'] = (self.df['paw_diff_5_frame'] <= -1*(self.retract_threshold_5_frame)) & (self.df['paw_in_roi'] == True)
 
     def add_changes_in_reach(self):
         for i, row in self.df.iterrows():
@@ -273,8 +277,8 @@ class ETL:
 
 
 class utils:
-    def __init__(self, absolute_path, FPS, reach_threshold, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset):
-        self.etl = ETL(absolute_path, FPS, reach_threshold, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
+    def __init__(self, absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset):
+        self.etl = ETL(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.etl.roi_corners()
         self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.etl.trough_coords
 
@@ -356,14 +360,14 @@ class utils:
 
 
 def main():
-    etl = ETL(absolute_path, FPS, reach_threshold, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
+    etl = ETL(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
 
 
 if __name__ == "__main__":
     DEBUG = True
 
     if DEBUG:
-        ut = utils(absolute_path, FPS, reach_threshold, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
+        ut = utils(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
         # ut.outline_hull(sample_image)
         # ut.outline_roi(sample_image)
         # ut.plot_roi()
