@@ -31,6 +31,7 @@ class ETL:
         self.add_time_metrics()
         self.add_velocity_metrics()
         self.add_velocity_metrics_from_origin()
+        self.add_changes_in_reach()
         self.print_head
         self.df.to_csv(output_file_path)
 
@@ -203,6 +204,14 @@ class ETL:
 
         self.df['paw_retract_3_frame'] = (self.df['paw_diff_3_frame'] <= -1*(self.reach_threshold)) & (self.df['paw_in_roi'] == True)
         self.df['paw_retract_5_frame'] = (self.df['paw_diff_5_frame'] <= -1*(self.reach_threshold)) & (self.df['paw_in_roi'] == True)
+
+    def add_changes_in_reach(self):
+        for i, row in self.df.iterrows():
+            if i > 0:
+                change_in_reach_5_frame = True if (self.df.loc[i]['paw_reach_5_frame'][0] == True and self.df.loc[i-1]['paw_reach_5_frame'][0] == False) else False
+            else:
+                change_in_reach_5_frame = False
+            self.df.at[i, 'change_in_reach_5_frame'] = change_in_reach_5_frame
 
     # gets the coords of x given a y value
     def get_x_coords(self, y, intercept, angle):
