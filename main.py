@@ -3,19 +3,22 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
+import os
+from collections import defaultdict
 
-absolute_path = '/home/gavin/zanna_data_analysis/01_Experiment 1_2019-11-08_S1_T1DLC_resnet50_ORDER_leftarm v2Feb10shuffle1_750000.csv'
+absolute_path = 'O:/Documents/PhD/Projects/ORDER/PYTHON analysis/Animal17_Timestamp_2019-11-06 09_54_22.mp4-DLC_resnet50_ORDER_leftarm v2Feb10shuffle1_650000.csv'
 trough_real_world_length = 9.5
 height_of_ROI = 2.2
 trough_left_offset = 0.35
 trough_right_offset = 0.5
-sample_image = r'/home/gavin/zanna_data_analysis/01_Experiment 1_2019-11-08_S1_T1.png'
+sample_image = r'O:/Documents/PhD/Projects/ORDER/PYTHON analysis/Animal17_labeled.png'
 p_cutoff = 0.9
-FPS = 23
-output_file_path = r'/home/gavin/zanna_data_analysis/output1.csv'
+FPS = 40.50
+output_file_path = r'O:/Documents/PhD/Projects/ORDER/PYTHON analysis/outputAnimal17.csv'
 reach_threshold = 0.6
 retract_threshold_3_frame = 0.31
 retract_threshold_5_frame = 0.4
+path_to_dir_containing_dlc_outputs = './output_dir'
 
 class ETL:
     def __init__(self, absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset=0, trough_right_offset=0):
@@ -69,13 +72,16 @@ class ETL:
     def roi_corners(self):
         trough_r_x, trough_r_y, trough_l_x, trough_l_y = self.trough_coords
         xy_deg = math.degrees(math.atan2(trough_l_y - trough_r_y, trough_r_x - trough_r_y))
-        angle = 90 - xy_deg
+        angle = xy_deg - 90
 
         # need to get bottom corners of roi first
         hypotenuse = self.height_of_ROI*self.pixels_to_real
 
-        dy = hypotenuse*math.cos(angle)
+        dy = hypotenuse*math.sin(math.radians(angle))
         dx = math.sqrt(hypotenuse**2 - dy**2)
+
+        if xy_deg > 0:
+            dx *= -1
 
         top_left_x, top_left_y = trough_l_x + dx, trough_l_y +dy
         top_right_x, top_right_y = trough_r_x + dx, trough_r_y + dy
@@ -360,17 +366,78 @@ class utils:
 
 
 def main():
-    etl = ETL(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
+    for fn in os.listdir(path_to_dir_containing_dlc_outputs):
+        if fn[:3] != 'out':
+            output_file_path = path_to_dir_containing_dlc_outputs + os.sep + 'output_' + fn
+            absolute_path = path_to_dir_containing_dlc_outputs + os.sep + fn
+            etl = ETL(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
+    master_df = pd.DataFrame(columns=['video_id', 'reaches_frame_459_690', 'tot_frame_459_690', 'path_length_frame_459_690', 'reaches_minute_total', 'tot_minute_total', 'nose_tot_minute_total', 'path_length_minute_total', 'reaches_session_total', 'tot_session_total', 'path_length_session_total'])
+    master_df.to_csv(path_to_dir_containing_dlc_outputs + os.sep + 'master_df.csv')
+    for fn in os.listdir(path_to_dir_containing_dlc_outputs):
+        if fn[:3] == 'out':
+            animal_id = fn.split('_')[2]
+            video_id = fn[7:-4]
+            df = pd.read_csv(path_to_dir_containing_dlc_outputs + os.sep + fn)
+            reaches_frame_459_690 = df['change_in_reach_3_frame'].iloc[459:690].sum()
+            tot_frame_459_690 = df['paw_in_roi'].loc[459:690].sum() * (1 / FPS)
+            path_length_frame_459_690 = df['paw_euc_dist_with_last_row'].loc[459:690].sum()
+            reaches_minute_total = df['change_in_reach_3_frame'].sum()
+            tot_minute_total = df['paw_in_roi'].sum() * (1 / FPS)
+            path_length_minute_total = df['paw_euc_dist_with_last_row'].sum()
+            nose_tot_minute_total = df['nose_in_roi'].sum() * (1 / FPS)
+            data = {'video_id': [video_id], 'reaches_frame_459_690': [reaches_frame_459_690], 'tot_frame_459_690': [tot_frame_459_690], 'path_length_frame_459_690': [path_length_frame_459_690], 'reaches_minute_total': [reaches_minute_total], 'tot_minute_total': [tot_minute_total], 'nose_tot_minute_total': [nose_tot_minute_total], 'path_length_minute_total': [path_length_minute_total], 'reaches_session_total': [np.NaN], 'tot_session_total': [np.NaN], 'path_length_session_total': [np.NaN]}
+            tmp_df = pd.DataFrame(data, columns=['video_id', 'reaches_frame_459_690', 'tot_frame_459_690', 'path_length_frame_459_690', 'reaches_minute_total', 'tot_minute_total', 'nose_tot_minute_total', 'path_length_minute_total', 'reaches_session_total', 'tot_session_total', 'path_length_session_total'])
+            master_df = pd.read_csv(path_to_dir_containing_dlc_outputs + os.sep + 'master_df.csv', index_col=0)
+            output_df = pd.concat([master_df, tmp_df])
+            output_df.to_csv(path_to_dir_containing_dlc_outputs + os.sep + 'master_df.csv')
+            
+    df = pd.read_csv(path_to_dir_containing_dlc_outputs + os.sep + 'master_df.csv', index_col=0)
+    sort_values = []
+    animal_ids = []
+    reaches_session_totals = defaultdict(int)
+    tot_session_totals = defaultdict(int)
+    path_length_session_totals = defaultdict(int)
+    reaches_session_totals_l = []
+    tot_session_totals_l = []
+    path_length_session_totals_l = []
 
+    for i, row in df.iterrows():
+        animal_id = row[0].split('_')[1]
+        reaches_session_totals[animal_id] += row['reaches_minute_total']
+        tot_session_totals[animal_id] += row['tot_minute_total']
+        path_length_session_totals[animal_id] += row['path_length_minute_total']
 
+        sort_value = animal_id + '_' + row[0].split('_')[0]
+        sort_values.append(sort_value)
+        animal_ids.append(animal_id)
+        
+
+    df['sort_values'] = sort_values
+    df['animal_id'] = animal_ids
+    
+    for i, row in df.iterrows():
+        reaches_session_totals_l.append(reaches_session_totals[row['animal_id']])
+        tot_session_totals_l.append(tot_session_totals[row['animal_id']])
+        path_length_session_totals_l.append(path_length_session_totals[row['animal_id']])
+        
+    df['reaches_session_total'] = reaches_session_totals_l
+    df['tot_session_total'] = tot_session_totals_l
+    df['path_length_session_total'] = path_length_session_totals_l
+    
+    df.sort_values(by='sort_values', inplace=True)
+    
+    
+    df.to_csv(path_to_dir_containing_dlc_outputs + os.sep + 'master_df.csv')
+     
+    # etl = ETL(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
 if __name__ == "__main__":
-    DEBUG = True
+    DEBUG = False
 
     if DEBUG:
         ut = utils(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
-        # ut.outline_hull(sample_image)
-        # ut.outline_roi(sample_image)
-        # ut.plot_roi()
+        ut.outline_hull(sample_image)
+        ut.outline_roi(sample_image)
+        #ut.plot_roi()
 
     else:
         main()
