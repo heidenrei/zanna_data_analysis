@@ -6,25 +6,27 @@ from PIL import Image, ImageDraw
 import os
 from collections import defaultdict
 
-absolute_path = 'O:/Documents/PhD/Projects/ORDER/PYTHON analysis/Animal17_Timestamp_2019-11-06 09_54_22.mp4-DLC_resnet50_ORDER_leftarm v2Feb10shuffle1_650000.csv'
+absolute_path = '/home/gavin/zanna_data_analysis/01_Experiment 1_2019-11-08_S1_T1DLC_resnet50_ORDER_leftarm v2Feb10shuffle1_750000.csv' 
 trough_real_world_length = 9.5
 height_of_ROI = 2.2
+depth_of_trough = 1.3
 trough_left_offset = 0.35
 trough_right_offset = 0.5
-sample_image = r'O:/Documents/PhD/Projects/ORDER/PYTHON analysis/Animal17_labeled.png'
+sample_image = '/home/gavin/zanna_data_analysis/tmprom_zgx1.PNG'
 p_cutoff = 0.9
 FPS = 40.50
-output_file_path = r'O:/Documents/PhD/Projects/ORDER/PYTHON analysis/outputAnimal17.csv'
+output_file_path = 'output_tester.csv'
 reach_threshold = 0.6
 retract_threshold_3_frame = 0.31
 retract_threshold_5_frame = 0.4
 path_to_dir_containing_dlc_outputs = './output_dir'
 
 class ETL:
-    def __init__(self, absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset=0, trough_right_offset=0):
+    def __init__(self, absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, depth_of_trough, p_cutoff, output_file_path, trough_left_offset=0, trough_right_offset=0):
         self.df = pd.read_csv(absolute_path, header=[1,2], index_col=0)
         self.trough_real_world_length = trough_real_world_length
         self.height_of_ROI = height_of_ROI
+        self.depth_of_trough = depth_of_trough
         self.trough_left_offset = trough_left_offset
         self.trough_right_offset = trough_right_offset
         self.FPS = FPS
@@ -34,7 +36,7 @@ class ETL:
         self.retract_threshold_3_frame = retract_threshold_3_frame
         self.retract_threshold_5_frame = retract_threshold_5_frame
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.roi_corners()
-        self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.trough_coords
+        self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.roi_bottom_corners()
         self.add_time_metrics()
         self.add_velocity_metrics()
         self.add_velocity_metrics_from_origin()
@@ -86,6 +88,24 @@ class ETL:
         top_left_x, top_left_y = trough_l_x + dx, trough_l_y +dy
         top_right_x, top_right_y = trough_r_x + dx, trough_r_y + dy
         return top_left_x, top_left_y, top_right_x, top_right_y
+        
+    def roi_bottom_corners(self):
+        trough_r_x, trough_r_y, trough_l_x, trough_l_y = self.trough_coords
+        xy_deg = math.degrees(math.atan2(trough_l_y - trough_r_y, trough_r_x - trough_r_y))
+        angle = xy_deg - 90
+
+        # need to get bottom corners of roi first
+        hypotenuse = self.depth_of_trough*self.pixels_to_real
+
+        dy = hypotenuse*math.sin(math.radians(angle))
+        dx = math.sqrt(hypotenuse**2 - dy**2)
+
+        if xy_deg < 0:
+            dx *= -1
+
+        bottom_left_x, bottom_left_y = trough_l_x - dx, trough_l_y - dy
+        bottom_right_x, bottom_right_y = trough_r_x - dx, trough_r_y - dy
+        return bottom_right_x, bottom_right_y, bottom_left_x, bottom_left_y
 
     # uses x product to check if given coordinate is inside the ROI..
     def in_roi(self, x, y) -> bool:
@@ -283,10 +303,10 @@ class ETL:
 
 
 class utils:
-    def __init__(self, absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset):
-        self.etl = ETL(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
+    def __init__(self, absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, depth_of_trough, p_cutoff, output_file_path, trough_left_offset, trough_right_offset):
+        self.etl = ETL(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, depth_of_trough, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
         self.top_left_x, self.top_left_y, self.top_right_x, self.top_right_y = self.etl.roi_corners()
-        self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.etl.trough_coords
+        self.bottom_right_x, self.bottom_right_y, self.bottom_left_x, self.bottom_left_y = self.etl.roi_bottom_corners()
 
     # make a plot in ugly mcdonalds colors of where the roi is in the frame
     def plot_roi(self):
@@ -370,7 +390,7 @@ def main():
         if fn[:3] != 'out':
             output_file_path = path_to_dir_containing_dlc_outputs + os.sep + 'output_' + fn
             absolute_path = path_to_dir_containing_dlc_outputs + os.sep + fn
-            etl = ETL(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
+            etl = ETL(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, depth_of_trough, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
     master_df = pd.DataFrame(columns=['video_id', 'reaches_frame_459_690', 'tot_frame_459_690', 'path_length_frame_459_690', 'reaches_minute_total', 'tot_minute_total', 'nose_tot_minute_total', 'path_length_minute_total', 'reaches_session_total', 'tot_session_total', 'path_length_session_total'])
     master_df.to_csv(path_to_dir_containing_dlc_outputs + os.sep + 'master_df.csv')
     for fn in os.listdir(path_to_dir_containing_dlc_outputs):
@@ -429,12 +449,12 @@ def main():
     
     df.to_csv(path_to_dir_containing_dlc_outputs + os.sep + 'master_df.csv')
      
-    # etl = ETL(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
+    # etl = ETL(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, depth_of_trough, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
 if __name__ == "__main__":
-    DEBUG = False
+    DEBUG = True
 
     if DEBUG:
-        ut = utils(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
+        ut = utils(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, depth_of_trough, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
         ut.outline_hull(sample_image)
         ut.outline_roi(sample_image)
         #ut.plot_roi()
