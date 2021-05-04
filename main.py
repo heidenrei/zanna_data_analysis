@@ -270,27 +270,28 @@ class ETL:
         return (y/angle - intercept/angle)
         
     def smooth_reaches(self, reach_3=True, reach_5=True, retract_3=False, retract_5=False):
+        print(self.df.shape)
         print('smoothing reaches')
         if reach_3:
             for i, row in self.df.iterrows():
-                if i > 0 and i < self.df.shape[0]:
+                if i > 0 and i < self.df.shape[0] - 1:
                     if self.df.loc[i-1]['paw_reach_3_frame'][0] == True and self.df.loc[i+1]['paw_reach_3_frame'][0] == True and self.df.loc[i]['paw_reach_3_frame'][0] == False:
                         self.df.at[i, 'paw_reach_3_frame'] = True
         if reach_5:
             for i, row in self.df.iterrows():
-                if i > 0 and i < self.df.shape[0]:
+                if i > 0 and i < self.df.shape[0] - 1:
                     if self.df.loc[i-1]['paw_reach_5_frame'][0] == True and self.df.loc[i+1]['paw_reach_5_frame'][0] == True and self.df.loc[i]['paw_reach_5_frame'][0] == False:
                         self.df.at[i, 'paw_reach_5_frame'] = True
        
         if retract_3:
             for i, row in self.df.iterrows():
-                if i > 0 and i < self.df.shape[0]:
+                if i > 0 and i < self.df.shape[0] - 1:
                     if self.df.loc[i-1]['paw_retract_3_frame'][0] == True and self.df.loc[i+1]['paw_retract_3_frame'][0] == True and self.df.loc[i]['paw_retract_3_frame'][0] == False:
                         self.df.at[i, 'paw_retract_3_frame'] = True
 
         if retract_5:
             for i, row in self.df.iterrows():
-                if i > 0 and i < self.df.shape[0]:
+                if i > 0 and i < self.df.shape[0] - 1:
                     if self.df.loc[i-1]['paw_retract_5_frame'][0] == True and self.df.loc[i+1]['paw_retract_5_frame'][0] == True and self.df.loc[i]['paw_retract_5_frame'][0] == False:
                         self.df.at[i, 'paw_retract_5_frame'] = True
 
@@ -414,9 +415,10 @@ class utils:
 
 def main():
     for fn in os.listdir(path_to_dir_containing_dlc_outputs):
-        if fn[:3] != 'out' and fn[:3] != 'mas':
+        if fn[:3] != 'out' and fn[:3] != 'mas' and fn[0] != '.':
             output_file_path = path_to_dir_containing_dlc_outputs + os.sep + 'output_' + fn
             absolute_path = path_to_dir_containing_dlc_outputs + os.sep + fn
+            print(absolute_path)
             etl = ETL(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, depth_of_trough, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
     master_df = pd.DataFrame(columns=['video_id', 'reaches_frame_459_690', 'tot_frame_459_690', 'path_length_frame_459_690', 'reaches_minute_total', 'tot_minute_total', 'nose_tot_minute_total', 'path_length_minute_total', 'reaches_session_total', 'tot_session_total', 'path_length_session_total'])
     master_df.to_csv(path_to_dir_containing_dlc_outputs + os.sep + 'master_df.csv')
