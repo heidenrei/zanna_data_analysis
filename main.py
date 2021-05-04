@@ -19,7 +19,7 @@ output_file_path = 'output_tester.csv'
 reach_threshold = 0.6
 retract_threshold_3_frame = 0.31
 retract_threshold_5_frame = 0.4
-path_to_dir_containing_dlc_outputs = './output_dir'
+path_to_dir_containing_dlc_outputs = './dlc_output_dir'
 
 class ETL:
     def __init__(self, absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, depth_of_trough, p_cutoff, output_file_path, trough_left_offset=0, trough_right_offset=0):
@@ -40,6 +40,7 @@ class ETL:
         self.add_time_metrics()
         self.add_velocity_metrics()
         self.add_velocity_metrics_from_origin()
+        self.smooth_reaches()
         self.add_changes_in_reach()
         self.print_head
         self.df.to_csv(output_file_path)
@@ -267,6 +268,32 @@ class ETL:
     # gets the coords of x given a y value
     def get_x_coords(self, y, intercept, angle):
         return (y/angle - intercept/angle)
+        
+    def smooth_reaches(self, reach_3=True, reach_5=True, retract_3=False, retract_5=False):
+        print('smoothing reaches')
+        if reach_3:
+            for i, row in self.df.iterrows():
+                if i > 0 and i < self.df.shape[0]:
+                    if self.df.loc[i-1]['paw_reach_3_frame'][0] == True and self.df.loc[i+1]['paw_reach_3_frame'][0] == True and self.df.loc[i]['paw_reach_3_frame'][0] == False:
+                        self.df.at[i, 'paw_reach_3_frame'] = True
+        if reach_5:
+            for i, row in self.df.iterrows():
+                if i > 0 and i < self.df.shape[0]:
+                    if self.df.loc[i-1]['paw_reach_5_frame'][0] == True and self.df.loc[i+1]['paw_reach_5_frame'][0] == True and self.df.loc[i]['paw_reach_5_frame'][0] == False:
+                        self.df.at[i, 'paw_reach_5_frame'] = True
+       
+        if retract_3:
+            for i, row in self.df.iterrows():
+                if i > 0 and i < self.df.shape[0]:
+                    if self.df.loc[i-1]['paw_retract_3_frame'][0] == True and self.df.loc[i+1]['paw_retract_3_frame'][0] == True and self.df.loc[i]['paw_retract_3_frame'][0] == False:
+                        self.df.at[i, 'paw_retract_3_frame'] = True
+
+        if retract_5:
+            for i, row in self.df.iterrows():
+                if i > 0 and i < self.df.shape[0]:
+                    if self.df.loc[i-1]['paw_retract_5_frame'][0] == True and self.df.loc[i+1]['paw_retract_5_frame'][0] == True and self.df.loc[i]['paw_retract_5_frame'][0] == False:
+                        self.df.at[i, 'paw_retract_5_frame'] = True
+
 
     # returns the average point of the troughl and troughr labels
     @property
@@ -387,7 +414,7 @@ class utils:
 
 def main():
     for fn in os.listdir(path_to_dir_containing_dlc_outputs):
-        if fn[:3] != 'out':
+        if fn[:3] != 'out' and fn[:3] != 'mas':
             output_file_path = path_to_dir_containing_dlc_outputs + os.sep + 'output_' + fn
             absolute_path = path_to_dir_containing_dlc_outputs + os.sep + fn
             etl = ETL(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, depth_of_trough, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
@@ -451,7 +478,7 @@ def main():
      
     # etl = ETL(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, depth_of_trough, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
 if __name__ == "__main__":
-    DEBUG = True
+    DEBUG = False
 
     if DEBUG:
         ut = utils(absolute_path, FPS, reach_threshold, retract_threshold_3_frame, retract_threshold_5_frame, trough_real_world_length, height_of_ROI, depth_of_trough, p_cutoff, output_file_path, trough_left_offset, trough_right_offset)
